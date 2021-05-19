@@ -65,7 +65,8 @@ filtered_eulachon_data <- taxa_catch_data %>%
          EVENT_ID %nin% c(4363856,
                           4363858,
                           4564096,
-                          4564094))
+                          4564094,
+                          4363883))
 
 
 # factor species name, taxonomic group, and area code again 
@@ -86,16 +87,39 @@ eulachon_wide_all_species <- pivot_wider(filtered_eulachon_data,
                              #names_prefix = "CPUE for ",
                              id_cols = !Taxonomic_group)
 
-# eulachon data filtered for species with mean CPUE above 40
+
+# Remove species with mean CPUE < 40
 
 eulachon_wide_1 <- eulachon_wide_all_species %>%
   dplyr::select(TRIP_ID:TEMPERATURE)      
 
-
 eulachon_wide_2 <- eulachon_wide_all_species[14:217] %>%
   dplyr::select(where(~ is.numeric(.x) && mean(.x) > 40))
 
+eulachon_wide_3 <- cbind(eulachon_wide_1, eulachon_wide_2)
+
+# use event ID as row names 
+
 eulachon_wide <- cbind(eulachon_wide_1, eulachon_wide_2)
+row.names(eulachon_wide) <- eulachon_wide$EVENT_ID
+
+#eulachon_wide4 <- data.frame(eulachon_wide3, row.names = 2)
+
+# log transform wide data
+
+eulachon_wide_log <- eulachon_wide
+
+for(i in 14:38){ 
+  minfish_eulachon<-min(subset(eulachon_wide_log[,i],eulachon_wide_log[,i]>0))/2
+  eulachon_wide_log[,i]<-log(eulachon_wide_log[,i]+minfish_eulachon)}
+
+# log (CPUE + 1) transformed wide data
+
+eulachon_wide_log_2 <- eulachon_wide
+
+for (i in 14:38) {
+  eulachon_wide_log_2[,i]<-log1p(eulachon_wide_log_2[,i])
+}
 
 
 # add log CPUE
@@ -104,18 +128,18 @@ eulachon_data <- filtered_eulachon_data %>%
   mutate(., log_CPUE = log(CPUE+1))
 
 
-# rename factor level North and South 
-
-eulachon_data$MAJOR_STAT_AREA_CODE <- recode_factor(eulachon_data$MAJOR_STAT_AREA_CODE, 
-                                                             "1" = "South",
-                                                             "8" = "North")
-
-str(eulachon_data)
-
 
 #=================================================
 # filtering by area (north vs south)
 #=================================================
+
+# rename factor level North and South 
+
+eulachon_data$MAJOR_STAT_AREA_CODE <- recode_factor(eulachon_data$MAJOR_STAT_AREA_CODE, 
+                                                    "1" = "South",
+                                                    "8" = "North")
+
+str(eulachon_data)
 
 # area 1 - south
 
@@ -241,7 +265,6 @@ mycolour1 <- c( "#000000","#80FFFF","#FF0000" , "#008000", "#808000", "#FF8000",
                "#0000FF", "#8000FF", "#FF00FF", "#0080FF","#8080FF", "#FF80FF",
                "#00FFFF", "#800000")
 
-mycolour2 <- primary.colors(11, steps = 4)
 
 month_colours <- c("Feb"='#e6194B', "Oct"='#3cb44b', "Mar"='#ffe119', "Apr"='#4363d8', 
                    "May"='#f58231', "Jul"='#42d4f4', "Jun"='#f032e6', "Sep"='#fabed4', 
@@ -434,15 +457,11 @@ ggplot(CPUE_by_month_area )+
 # Figure 4. Correlation plot among species for co-occurrence in the trawl hauls
 #===================================================================================
 
-# all species all areas = way to complex
-
-species_cor <- cor(data.frame(eulachon_wide[,14:38]),use="complete.obs")
+species_cor <- cor(data.frame(eulachon_wide_log[,14:38]),use="complete.obs")
 
 species_cor
 
 corrplot(species_cor, tl.col = "black")
-
-
 
 #==============================================================================
 # Figure 5. Bray-curtis dissimilarity dendrograms between months and areas
