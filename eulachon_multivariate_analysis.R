@@ -562,7 +562,6 @@ plot(eulachon_wide_log[,13],fish_scores[,4],xlab="Temp",ylab="Component 4")
 
 adonis(event_dist ~ MAJOR_STAT_AREA_CODE, data = eulachon_wide)
 
-
 # Taxonomic (Bray-Curtis) dissimilarity explained - temperature
 
 adonis(event_dist ~ MEAN_TEMPERATURE, data = eulachon_wide)

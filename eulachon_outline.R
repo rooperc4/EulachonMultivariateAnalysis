@@ -26,37 +26,47 @@ library(corrplot)
 
 # import data sets
 
-taxa_data <- import("C:\\Users\\hackettb\\Documents\\R\\eulachon_project\\TaxaGroups.csv")
+taxa_data <- import("C:\\Users\\hackettb\\Documents\\R\\eulachon_project\\eulachon\\TaxaGroups.csv")
 
-catch_data <- import("C:\\Users\\hackettb\\Documents\\R\\eulachon_project\\catch.csv")
+catch_data <- import("C:\\Users\\hackettb\\Documents\\R\\eulachon_project\\eulachon\\catch.csv")
 
+temp_data <- import("C:\\Users\\hackettb\\Documents\\R\\eulachon_project\\eulachon\\temperature.csv")
 
 # merge data sets
 
 taxa_catch_data <- merge(catch_data, taxa_data, by = "Species_name")
 
+taxa_catch_temp_data <- merge( taxa_catch_data, temp_data, by = c("TRIP_ID", "EVENT_ID"))
+
+taxa_catch_temp_data <- taxa_catch_temp_data %>%
+  dplyr::select(Species_name, TRIP_ID,EVENT_ID, SET_ID, YEAR, MONTH, DATE, 
+                MAJOR_STAT_AREA_CODE,START_LATITUDE, START_LONGITUDE,
+                END_LATITUDE, END_LONGITUDE, DEPTH, MEAN_TEMPERATURE, 
+                CPUE, Taxonomic_group) %>%
+  arrange(., Species_name)
+
 
 # change species name, taxonomic group, and area code to factor 
 
-taxa_catch_data$Species_name <- factor(taxa_catch_data$Species_name)
+taxa_catch_temp_data$Species_name <- factor(taxa_catch_temp_data$Species_name)
 
-taxa_catch_data$Taxonomic_group <- factor(taxa_catch_data$Taxonomic_group)
+taxa_catch_temp_data$Taxonomic_group <- factor(taxa_catch_temp_data$Taxonomic_group)
 
-taxa_catch_data$MAJOR_STAT_AREA_CODE <- factor(taxa_catch_data$MAJOR_STAT_AREA_CODE)
+taxa_catch_temp_data$MAJOR_STAT_AREA_CODE <- factor(taxa_catch_temp_data$MAJOR_STAT_AREA_CODE)
 
 
 # manipulate date variables with lubridate
 
-taxa_catch_data$DATE <- ymd(taxa_catch_data$DATE)
+taxa_catch_temp_data$DATE <- ymd(taxa_catch_temp_data$DATE)
 
-taxa_catch_data$MONTH <- month(taxa_catch_data$DATE, label = TRUE, abbr = TRUE)
+taxa_catch_temp_data$MONTH <- month(taxa_catch_temp_data$DATE, label = TRUE, abbr = TRUE)
 
-taxa_catch_data$YEAR <- year(taxa_catch_data$DATE)
+taxa_catch_temp_data$YEAR <- year(taxa_catch_temp_data$DATE)
 
 
 # remove irrelevant taxa groups and tows from Hecate Strait and sets with only Eulachon CPUE recorded
 
-filtered_eulachon_data <- taxa_catch_data %>%
+filtered_eulachon_data <- taxa_catch_temp_data %>%
   filter(., Taxonomic_group %nin% c("Marine mammal",
                                     "Other",
                                     "Euphausid",
@@ -91,16 +101,15 @@ eulachon_wide_all_species <- pivot_wider(filtered_eulachon_data,
 # Remove species with mean CPUE < 40
 
 eulachon_wide_1 <- eulachon_wide_all_species %>%
-  dplyr::select(TRIP_ID:TEMPERATURE)      
+  dplyr::select(TRIP_ID:MEAN_TEMPERATURE)      
 
 eulachon_wide_2 <- eulachon_wide_all_species[14:217] %>%
   dplyr::select(where(~ is.numeric(.x) && mean(.x) > 40))
 
-eulachon_wide_3 <- cbind(eulachon_wide_1, eulachon_wide_2)
+eulachon_wide <- cbind(eulachon_wide_1, eulachon_wide_2)
 
 # use event ID as row names 
 
-eulachon_wide <- cbind(eulachon_wide_1, eulachon_wide_2)
 row.names(eulachon_wide) <- eulachon_wide$EVENT_ID
 
 #eulachon_wide4 <- data.frame(eulachon_wide3, row.names = 2)
@@ -125,9 +134,24 @@ for (i in 14:38) {
 # add log CPUE
 
 eulachon_data <- filtered_eulachon_data %>% 
-  mutate(., log_CPUE = log(CPUE+1))
+  mutate(., log_CPUE = log(CPUE+1), .after = CPUE)
 
+# adding season to data set
 
+eulachon_wide_season <- eulachon_wide %>% 
+  mutate(., SEASON = recode(eulachon_wide$MONTH, 
+                            "Jan" = "Winter",
+                            "Feb"="Winter",
+                            "Mar"="Spring",
+                            "Apr"="Spring",
+                            "May"="Spring",
+                            "Jun"="Summer",
+                            "Jul"="Summer",
+                            "Aug"="Summer",
+                            "Sep"="Fall",
+                            "Oct"="Fall",
+                            "Nov"="Fall",
+                            "Dec"="Winter"), .after=DATE)
 
 #=================================================
 # filtering by area (north vs south)
@@ -251,14 +275,6 @@ primary.colors <- function(n, steps = 3, no.white = TRUE)
 }
 
 
-mycolour <- c('#e6194B', '#3cb44b', '#ffe119', '#4363d8', 
-              '#f58231', '#911eb4', '#42d4f4', '#f032e6', 
-              '#bfef45', '#fabed4', '#469990', '#dcbeff', 
-              '#9A6324', '#fffac8', '#800000', '#aaffc3', 
-              '#808000', '#ffd8b1', '#000075', '#a9a9a9',
-              "#0000FF", "#8000FF", "#FF00FF", "#0080FF", "#8080FF", "#FF80FF")
-
-
 mycolour1 <- c( "#000000","#80FFFF","#FF0000" , "#008000", "#808000", "#FF8000",
                 "#000080" , "#80FF00", "#FFFF00",'#dcbeff', "#800080", "#FF0080",
                "#008080", "#808080", "#FF8080",'#9A6324',"#80FF80", "#FFFF80",
@@ -270,6 +286,11 @@ month_colours <- c("Feb"='#e6194B', "Oct"='#3cb44b', "Mar"='#ffe119', "Apr"='#43
                    "May"='#f58231', "Jul"='#42d4f4', "Jun"='#f032e6', "Sep"='#fabed4', 
                     "Dec"='#dcbeff', "Nov"='#800000', "Jan"='#aaffc3')
 
+
+season_colours <- c('Winter'="blue",
+                    'Spring'="orange",
+                    'Summer'="red",
+                    'Fall'="green")
 
 #========================================================
 # Table 1. Number of samples by month and year and area
